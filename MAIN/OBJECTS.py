@@ -28,11 +28,11 @@ newcenterstep = 10 ## Number of times during the simulation you want new food cl
 enz = 3 ## The amount of food toughness removed per step by a unicellular CA
 foodtough = enz ## Minimum max food toughness in simulation
 foodregenz = enz/6 ## How much food toughness is regenerated per step
-nutrition = foodtough * 0.1 ## ratio of reward to toughness of food
-foodloss = 0.01 ## How much food agents lose per step
+nutrition = foodtough * 0.2 ## ratio of reward to toughness of food
+foodloss = 0.005 ## How much food agents lose per step
 
 #####################################
-## BASE FUNCTIONS
+## BASE FUNCTIONS 
 #####################################
 
 def sigmoid(x):
@@ -50,6 +50,7 @@ def frameconvert(seed,xmin,xmax,ymin,ymax):
         row = array[i]
         newarray.append(row[ymin:ymax])
     return(newarray)
+
 
 ########################################
 ########################################
@@ -88,6 +89,7 @@ class World:
         self.Y = Y
         self.foodloss = foodloss
         self.newfood = newfood
+        self.foodintro = True
         self.foodchance = foodchance
         self.steps = 0
         self.CAs = list()
@@ -101,6 +103,7 @@ class World:
         self.foodtough = foodtough
         self.foodregenz = foodregenz
         self.nutrition = nutrition
+        self.metabolism = True
         self.caf_scal = caf_scal
         self.adhesion_scal = adhesion_scal
         self.agent_chemo_scal = agent_chemo_scal
@@ -149,9 +152,12 @@ class World:
             til.ftcap = til.foodtough
         ## Generate CAs
         self.enz = enz
+        self.IDcount = 0
         for i in range(start_CA):
             cell = CA(self)
             self.CAs.append(cell)
+            self.IDcount = self.IDcount + 1
+        self.CA_history = []
         ## World Output Data
         self.arrays = list()
         self.data = list()
@@ -230,6 +236,7 @@ class World:
                           vmin = 0, vmax = self.G0 + 9)
             pyplot.show()
     
+    
     ####################################
     ##  CHEMO GRADIENT FUNCTIONS
     ####################################
@@ -440,8 +447,10 @@ class World:
                     newcell.x = loc.x
                     newcell.y = loc.y
                     newcell.getNeighbors(self)
+                    newcell.move_desires(self)
                     newcell.fill = cell.fill
                     self.CAs.append(newcell)
+                    self.IDcount = self.IDcount + 1
                     check = 1
                     
     def checkRepro(self):
@@ -495,11 +504,7 @@ class World:
         self.CAs.sort()
         for cell in self.CAs:
             cell.move_desires(self)
-            cell.move_adhesion(self)
-            ## Move each cell and update chemical gradiants (in function)
-            ## Note that for CAS there are two move functions to choose from,
-            ## comment out one.
-            ## cell.movebrain(self)
+        for cell in self.CAs:
             cell.movesimple(self)
         
         ### CHECKS
@@ -511,13 +516,17 @@ class World:
         nUni = len(self.CAs)
         self.run.append([self.steps,nUni,self.CAfood])
         fills = []
-        xs = []
-        ys = []
         for cell in self.CAs:
-            fills.append(cell.fill)
-            xs.append(cell.x)
-            ys.append(cell.y)
-        self.fills.append([fills,xs,ys])
+            fills.append([cell.fill, cell.x, cell.y, self.steps])
+        self.fills.append(fills)
+        history_cells = []
+        for cell in self.CAs:
+            history_cell = CA(self)
+            history_cell.x = cell.x
+            history_cell.y = cell.y
+            history_cell.fill = cell.fill
+            history_cells.append(history_cell)
+        self.CA_history.append(history_cells)
         self.steps = self.steps + 1
     
 
@@ -529,7 +538,7 @@ class World:
     
 class Zoo:
     def __init__(self, ID, seed, seedCAs, timesteps, xmax, xmin, ymax, ymin,
-                 newfood,
+                 metabolism,newfood,foodintro,
                  foodchance,caf_scal, adhesion_scal, 
                  agent_chemo_scal,display):
         ## Give world attributes
@@ -543,7 +552,9 @@ class Zoo:
         self.ymin = ymin
         self.X = self.xmax-self.xmin
         self.Y = self.ymax-self.ymin
+        self.metabolism = metabolism
         self.newfood = newfood
+        self.foodintro = foodintro
         self.foodchance = foodchance
         self.foodloss = foodloss
         self.steps = 0
@@ -584,12 +595,14 @@ class Zoo:
         self.center_dev = self.X/self.cdev # defines the standard deviation of clusters
         ## Add food and CAs
         self.enz = enz
+        self.IDcount = 0
         for cell in self.seedCAs:
             newcell = CA(self)
             newcell.x = cell.x - self.xmin -1
             newcell.y = cell.y - self.ymin -1
             newcell.fill = cell.fill
             self.CAs.append(newcell) 
+            self.IDcount = self.IDcount + 1
         seedx = 0
         for i in self.seed:
             seedy = 0
@@ -601,7 +614,10 @@ class Zoo:
                     til.ftcap = til.foodtough
                 seedy = seedy + 1
             seedx = seedx + 1
+        
         ## World Output Data
+        self.dists = list()
+        self.stepdists = list()
         self.arrays = list()
         self.data = list()
         self.run = list()
@@ -679,6 +695,7 @@ class Zoo:
                           vmin = 0, vmax = self.G0 + 5)
             pyplot.show()
     
+    
     ####################################
     ##  CHEMO GRADIENT FUNCTIONS
     ####################################
@@ -866,10 +883,23 @@ class Zoo:
                     tile.CAfood = False
         self.CAfood = foodcount
                     
+                    
     ####################################
     ##  CHECK CONDITION FUNCTIONS
     ####################################
-
+                
+    def checkEnd(self):
+        if len(self.CAs) == 0:
+            print("All synthetics have died.")
+            return True
+        elif self.steps == (self.timesteps - 1):
+            self.step()
+            print("End Zoo")
+            return True
+        else:
+            return False
+    
+    
     def Reproduce(self, cell):
         neighbors = cell.neighbors
         check = 0
@@ -888,28 +918,89 @@ class Zoo:
                     newcell.x = loc.x
                     newcell.y = loc.y
                     newcell.getNeighbors(self)
+                    newcell.move_desires(self)
                     newcell.fill = cell.fill
                     self.CAs.append(newcell)
+                    self.IDcount = self.IDcount + 1
                     check = 1
-                
-    def checkEnd(self):
-        if len(self.CAs) == 0:
-            print("All synthetics have died.")
-            return True
-        elif self.steps == (self.timesteps - 1):
-            self.step()
-            print("End Zoo")
-            return True
-        else:
-            return False
+                    
+    def checkRepro(self):
+        for cell in self.CAs:
+            cell.getNeighbors(self)
+            if cell.fill >= 1:
+                self.Reproduce(cell)
+                #print("A cell reproduced!")
+            else:
+                self.CAs = self.CAs
+        self.updateCA()
+    
+    def checkDeath(self):
+        for cell in self.CAs:
+            if cell.fill <= 0:
+                cell.end = self.steps
+                self.data.append(["cell", "died", cell.ID, "gen", cell.start, cell.end, 
+                                  cell.lifespan, cell.children, cell.filllist])
+                self.tiles[cell.x][cell.y].CA = False
+                self.CAs.remove(cell)
+                #print("A cell has died :(")
+            else:
+                cell.lifespan = cell.lifespan + 1
+        self.updateCA()
         
+        
+    def getdists(self):
+        cells = list()
+        neighbors = list()
+        for c in self.CAs:
+            cells.append(c)
+            neighbors.append(c)
+        for cell in cells:
+            best_dist = self.X
+            neighbors.remove(cell)
+            check = 0
+            count = 1
+            myneighbors = list()
+            for n in cell.neighbors:
+                myneighbors.append(n)
+            while check == 0:
+                for n in myneighbors:
+                    if n.CA == True:
+                        if n.x != cell.x  or n.y != cell.y:
+                            check = 1
+                            best_dist = count
+                            break
+                if check != 1:
+                    newmyneighbors = list()
+                    for mn in myneighbors:
+                        t1x = mn.x+1
+                        t1coords = self.wrapper([(t1x,mn.y)])
+                        t1 = self.tiles[t1coords[0][0]][t1coords[0][1]]
+                        newmyneighbors.append(t1)
+                        t2y = mn.y+1
+                        t2coords = self.wrapper([(mn.x,t2y)])
+                        t2 = self.tiles[t2coords[0][0]][t2coords[0][1]]
+                        newmyneighbors.append(t2)
+                        t3x = mn.x-1
+                        t3coords = self.wrapper([(t3x,mn.y)])
+                        t3 = self.tiles[t3coords[0][0]][t3coords[0][1]]
+                        newmyneighbors.append(t3)
+                        t4y = mn.y-1
+                        t4coords = self.wrapper([(mn.x,t4y)])
+                        t4 = self.tiles[t4coords[0][0]][t4coords[0][1]]
+                        newmyneighbors.append(t4)
+                    myneighbors = newmyneighbors
+                    count = count+1
+            metric_data = [cell.ID, cell.fill, best_dist, self.steps]
+            self.dists.append(metric_data)
+    
     ####################################
     ##  STEP FUNCTION
     ####################################
         
     def step(self):
         self.showZoo()
-        self.addFood()
+        if self.foodintro == True:
+            self.addFood()
         
         ### EAT & ADD FOOD
         for cell in self.CAs:
@@ -920,17 +1011,24 @@ class Zoo:
         self.CAs.sort()
         for cell in self.CAs:
             cell.move_desires(self)
-            cell.move_adhesion(self)
-            ## Move each cell and update chemical gradiants (in function)
-            ## Note that for CAS there are two move functions to choose from,
-            ## comment out one.
-            ## cell.movebrain(self)
+        for cell in self.CAs:
             cell.movesimple(self)
         
+        ### CHECKS
+        ## Check for cell death and reproduction
+        if self.metabolism == True:
+            self.checkDeath()
+            self.checkRepro()
+        
         ### STEP
+        for cell in self.CAs:
+            cell.filllist.append(cell.fill)
         nUni = len(self.CAs)
-        self.run.append([self.steps,nUni,self.CAfood])
+        self.run.append([self.steps,nUni])
+        self.getdists()
+    
         self.steps = self.steps + 1
+        print("step")
     
 
 ########################################
@@ -942,7 +1040,7 @@ class Zoo:
 class CA:
     def __init__(self,env):
          ## BASICS
-         self.ID = len(env.CAs) + 1
+         self.ID = env.IDcount
          self.start = env.steps
          self.lifespan = env.steps
          self.end = 0
@@ -950,7 +1048,8 @@ class CA:
          self.y = random.randrange(0,(env.Y-1),1)
          ## EATING & MOVING
          self.enz = env.enz
-         self.fill = 0.8
+         self.fill = 0.6
+         self.filllist = list()
          self.neighbors = []
          self.children = 0
          self.motors = []
@@ -1001,7 +1100,7 @@ class CA:
         self.x = self.x
         
     def breaker(self, env):
-        self.getNeighbors(env)
+        #self.getNeighbors(env)
         count = 0
         result = False
         for n in self.neighbors:
@@ -1015,6 +1114,7 @@ class CA:
         return result
         
     def getGoodMoves(self, env):
+        self.getNeighbors(env)
         env.updateCA()
         self.goodmoves = [4]
         maxmot = max(self.motors)
@@ -1026,12 +1126,12 @@ class CA:
             else:
                 move = self.motors.index(maxmot)
                 if self.spaces[move] == True:
-                    self.motors[move] = -10
+                    self.motors[move] = -1000
                     maxmot = max(self.motors)
                 else:
                     self.goodmoves.append(move)
                     bestvalue = maxmot
-                    self.motors[move] = -10
+                    self.motors[move] = -1000
                     maxmot = max(self.motors)
         if len(self.goodmoves) > 1:
             self.goodmoves.remove(4)
@@ -1055,39 +1155,29 @@ class CA:
             ## are less inclined to approach other agents like them. Multiply 
             ## by 2 to scale it back to the fill's original value (for 
             ## proportioning the constants)
-            #grads.append(sigmoid(tile.CAgrad*zoo.agent_chemo_scal*(self.fill - 0.5)))
             grads.append(tile.CAgrad*env.agent_chemo_scal*-2*(self.fill - 0.5))
         friend_want = grads
         self.friend_wants.append(friend_want)
         self.motors = np.add(self.motors,grads)
         self.motors = self.motors.tolist()
-        
-        self.movedesire = self.motors.index(max(self.motors))
-        env.tiles[self.x][self.y].desire = self.movedesire
-        
-    def move_adhesion(self, env):
-        self.getNeighbors(env)
-        desires1 = []
-        for n in self.neighbors:
-            if n.CA == True:
-                desires1.append(n.desire)
-            else:
-                desires1.append(10)
-        for i in range(3):
-            if desires1[i] <= 3:
-                d = desires1[i]
-                ### ADHESION RULE
-                #self.motors[d] = self.motors[d] + sigmoid(zoo.adhesion_scal * (1/self.fill))
-                desire_want = [d,(env.adhesion_scal * (0.5/self.fill))]
-                self.desire_wants.append(desire_want)
-                self.motors[d] = self.motors[d] + (env.adhesion_scal * (0.5/self.fill))
             
     def movesimple(self,env):
         env.tiles[self.x][self.y].fill = 0
-        #self.move_agent_desires(zoo)
         self.goodmoves = self.getGoodMoves(env)
         move = random.choice(self.goodmoves)
         self.choices.append(move)
+        
+        ### ADHESION RULE
+        for n in self.neighbors:
+            if n.CA == True:
+                X = n.x
+                Y = n.y
+                for cell in env.CAs:
+                    if cell.x == X and cell.y == Y: 
+                        if move != 4:
+                            cell.move_desires(env)
+                            #cell.motors[move] = cell.motors[move] + (env.adhesion_scal*-2*(cell.fill - 0.5))
+                            cell.motors[move] = cell.motors[move] + (env.adhesion_scal * (0.5/cell.fill))
         if move == 0:
             self.moveright()
         elif move == 1:
@@ -1104,7 +1194,8 @@ class CA:
         self.y = coords[0][1]
         env.tiles[self.x][self.y].fill = self.fill
         self.motors = []
-        self.fill = self.fill - foodloss
+        if env.metabolism == True:
+            self.fill = self.fill - env.foodloss
         env.updateCA()
         env.updateCAGrad()
         self.getNeighbors(env)
@@ -1124,10 +1215,14 @@ class CA:
                 posy = neighbor.y
                 env.tiles[posx][posy].foodtough = env.tiles[posx][posy].foodtough - self.enz
                 if env.tiles[posx][posy].foodtough <= 0:
+                    if env.metabolism == True:
+                        self.fill = self.fill + env.tiles[posx][posy].foodvalue
                     env.tiles[posx][posy].CAfood = False
                     env.tiles[posx][posy].foodvalue = 0.0
                     env.tiles[posx][posy].foodtough = 0.0
                     env.tiles[posx][posy].ftcap = 0.0
+                    
+                
                 
     def eatWorld(self, world):
         self.getNeighbors(world)
@@ -1146,7 +1241,10 @@ class CA:
                     self.fill = self.fill
             else:
                 self.fill = self.fill
-        
+                
+                
+                
+    
         
         
         
