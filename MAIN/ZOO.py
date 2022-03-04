@@ -3,7 +3,6 @@
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
-import statistics 
 import OBJECTS
 import MODEL
 
@@ -18,18 +17,18 @@ import MODEL
 
 ######################
 #### ZOO CREATION ####
-trial = "frm215:x918:y1322:9c:fYmY"
+trial = "X"
 zooconfig = "[1,1,1]"
 zooconfig2 = "{}{}".format(zooconfig,trial)
-loadstring = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/{}_ARRAYdata.csv'.format(zooconfig)
-initstring = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/{}_INITSdata.csv'.format(zooconfig)
+loadstring = '{}_ARRAYdata.csv'.format(zooconfig)
+initstring = '{}_INITSdata.csv'.format(zooconfig)
 
 zooworld = np.loadtxt(loadstring, dtype = float, delimiter = ',')
 zooworld = zooworld.reshape(-1,MODEL.X,MODEL.Y)
 zooinits = np.loadtxt(initstring, dtype = float, delimiter = ',')
 
 ## First select start frame and area of interest
-#### AXES ARE BACKWARDS: Y IS X, X IS Y
+#### BUG: AXES ARE BACKWARDS IN VISUALS, Y IS X, X IS Y, NEED TO FIX
 frame = 215
 xmin = 9
 xmax = 18
@@ -65,12 +64,6 @@ for row in zooinits:
                 cell.x = int(row[1])
                 cell.y = int(row[2])
                 seedCAs.append(cell)
-
-# seedCAs = []
-# for cell in world.CA_history[frame]:
-#     if cell.x >= xmin and cell.x <= xmax:
-#         if cell.y >= ymin and cell.y <= ymax:
-#             seedCAs.append(cell)
 seed = OBJECTS.frameconvert(seed,xmin,xmax,ymin,ymax)
 
 ## MAKE ZOO
@@ -111,11 +104,11 @@ for r in range(zooRuns):
     for cell in zoo.CAs:
         FILLtotal_zoo.append(cell.filllist)
         
-outputCA_string_zoo = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/ZOO/{}_ZOO_CAdata.csv'.format(zooconfig2)
-outputPOP_string_zoo = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/ZOO/{}_ZOO_POPdata.csv'.format(zooconfig2)
-outputFILL_string_zoo = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/ZOO/{}_ZOO_FILLdata.csv'.format(zooconfig2)
-outputDIST_string_zoo = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/ZOO/{}_ZOO_DISTdata.csv'.format(zooconfig2)
-outputSTEPDIST_string_zoo = '/Users/eden/Desktop/RESEARCH/MODEL/DATA/MAIN/ZOO/{}_ZOO_STEPDISTdata.csv'.format(zooconfig2)
+outputCA_string_zoo = '{}_ZOO_CAdata.csv'.format(zooconfig2)
+outputPOP_string_zoo = '{}_ZOO_POPdata.csv'.format(zooconfig2)
+outputFILL_string_zoo = '{}_ZOO_FILLdata.csv'.format(zooconfig2)
+outputDIST_string_zoo = '{}_ZOO_DISTdata.csv'.format(zooconfig2)
+outputSTEPDIST_string_zoo = '{}_ZOO_STEPDISTdata.csv'.format(zooconfig2)
 
 np.savetxt(outputCA_string_zoo, CAtotal_zoo, delimiter = ',', fmt='%s')
 np.savetxt(outputPOP_string_zoo, POPtotal_zoo, delimiter = ',', fmt='%s')
@@ -139,40 +132,10 @@ def updatefig_zoo(j):
 
 ani_zoo = animation.FuncAnimation(fig_zoo, updatefig_zoo, frames=range(len(zoo.arrays)),
                               interval=50, blit=True)
-ani_zoo.save('/Users/eden/Desktop/RESEARCH/MODEL/DATA/VIDEOS/MENAGERIE/{}_ZOO_VID.mp4'.format(zooconfig2), 
+ani_zoo.save('{}_ZOO_VID.mp4'.format(zooconfig2), 
           writer = 'ffmpeg', fps = 10)
 
 #plt.show()
-
-#################################
-#### PERSISTENCE & PROXIMITY ####
-
-# def metric_1(t1, t2, zoo):
-#     time1 = t1
-#     time2 = t2
-#     time = list(range(time1,time2+1))
-#     distset = list()
-#     for i in time:
-#         dist = statistics.mean(map(float,zoo.dists[i]))
-#         distset.append(dist)
-#         lil_metric_1 = statistics.mean(map(float,distset))
-#     return(lil_metric_1)
-
-# def metric_2(t1, t2, zoo):
-#     distchange = list()
-#     tm = t2 - t1
-#     for i in range(tm): 
-#         pt1 = zoo.dists[i]
-#         pt2 = zoo.dists[i+1]
-#         array1 = np.array(pt1)
-#         array2 = np.array(pt2)
-#         subtracted_array = np.subtract(array1, array2)
-#         subtracted = list(subtracted_array)
-#         change = [abs(ele) for ele in subtracted]
-#         changemean = statistics.mean(map(float, change))
-#         distchange.append(changemean)
-#         lil_metric_2 = statistics.mean(map(float,distchange))
-#     return(lil_metric_2)
 
 ####################
 #### WORM PLOTS ####
@@ -213,29 +176,8 @@ def animate_rotate(i):
 
 anim = animation.FuncAnimation(fig_worm, animate_rotate, frames=360, interval=20, blit=True)
 
-anim.save('/Users/eden/Desktop/RESEARCH/MODEL/DATA/VIDEOS/MENAGERIE/PLOTS/{}_animation.mp4'.format(zooconfig2),
+anim.save('{}_animation.mp4'.format(zooconfig2),
           fps=30, extra_args=['-vcodec', 'libx264'])
-
-    
-###################
-#### ECO PLOTS ####
-
-
-# distlist = []
-# steplist = []
-# count = 0
-# for d in zoo.dists:
-#     for i in d:
-#         distlist.append(i)
-#         steplist.append(count)
-#     count = count + 1
-    
-
-# plt.scatter(steplist,distlist)
-# plt.show
-
-
-
 
 
 

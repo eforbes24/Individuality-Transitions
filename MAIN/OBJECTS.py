@@ -9,8 +9,6 @@ from sklearn.datasets import make_blobs
 from matplotlib import pyplot
 from matplotlib.pyplot import figure
 
-#### FROZEN VARIABLES: DO NOT CHANGE FOR SCIENTIFIC PURPOSES
-
 ## Gradient Features
 g1 = 0.5 ## Chemotaxis gradient one Manhatten distance from food source
 g2 = 0.25 ## Chemotaxis gradient two Manhatten distance from food source
